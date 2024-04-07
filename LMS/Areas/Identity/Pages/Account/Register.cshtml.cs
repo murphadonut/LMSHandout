@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace LMS.Areas.Identity.Pages.Account
@@ -80,7 +81,7 @@ namespace LMS.Areas.Identity.Pages.Account
         {
 
             [Required]
-            [Display( Name = "Role" )]
+            [Display(Name = "Role")]
             public string Role { get; set; }
 
             public List<SelectListItem> Roles { get; } = new List<SelectListItem>
@@ -98,68 +99,68 @@ namespace LMS.Areas.Identity.Pages.Account
             };
 
             [Required]
-            [Display( Name = "First Name" )]
+            [Display(Name = "First Name")]
             public string FirstName { get; set; }
 
             [Required]
-            [Display( Name = "Last Name" )]
+            [Display(Name = "Last Name")]
             public string LastName { get; set; }
 
             [Required]
-            [Display( Name = "Date of Birth" )]
-            [BindProperty, DisplayFormat( DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true )]
-            [DataType( DataType.Date )]
+            [Display(Name = "Date of Birth")]
+            [BindProperty, DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}", ApplyFormatInEditMode = true)]
+            [DataType(DataType.Date)]
             public System.DateTime DOB { get; set; } = DateTime.Now;
 
             [Required]
             //[StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-            [DataType( DataType.Password )]
-            [Display( Name = "Password" )]
+            [DataType(DataType.Password)]
+            [Display(Name = "Password")]
             public string Password { get; set; }
 
-            [DataType( DataType.Password )]
-            [Display( Name = "Confirm password" )]
-            [Compare( "Password", ErrorMessage = "The password and confirmation password do not match." )]
+            [DataType(DataType.Password)]
+            [Display(Name = "Confirm password")]
+            [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
             public string ConfirmPassword { get; set; }
 
         }
 
 
-        public async Task OnGetAsync( string returnUrl = null )
+        public async Task OnGetAsync(string returnUrl = null)
         {
             ReturnUrl = returnUrl;
-            ExternalLogins = ( await _signInManager.GetExternalAuthenticationSchemesAsync() ).ToList();
+            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
 
 
 
         }
 
-        public async Task<IActionResult> OnPostAsync( string returnUrl = null )
+        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
         {
-            returnUrl ??= Url.Content( "~/" );
-            ExternalLogins = ( await _signInManager.GetExternalAuthenticationSchemesAsync() ).ToList();
-            if ( ModelState.IsValid )
+            returnUrl ??= Url.Content("~/");
+            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+            if (ModelState.IsValid)
             {
                 var uid = CreateNewUser(Input.FirstName, Input.LastName, Input.DOB, Input.Department, Input.Role);
                 var user = new ApplicationUser { UserName = uid };
 
-                await _userStore.SetUserNameAsync( user, uid, CancellationToken.None );
+                await _userStore.SetUserNameAsync(user, uid, CancellationToken.None);
                 var result = await _userManager.CreateAsync(user, Input.Password);
 
-                if ( result.Succeeded )
+                if (result.Succeeded)
                 {
-                    _logger.LogInformation( "User created a new account with password." );
-                    await _userManager.AddToRoleAsync( user, Input.Role );
+                    _logger.LogInformation("User created a new account with password.");
+                    await _userManager.AddToRoleAsync(user, Input.Role);
 
                     var userId = await _userManager.GetUserIdAsync(user);
 
-                    await _signInManager.SignInAsync( user, isPersistent: false );
-                    return LocalRedirect( returnUrl );
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    return LocalRedirect(returnUrl);
 
                 }
-                foreach ( var error in result.Errors )
+                foreach (var error in result.Errors)
                 {
-                    ModelState.AddModelError( string.Empty, error.Description );
+                    ModelState.AddModelError(string.Empty, error.Description);
                 }
             }
 
@@ -175,9 +176,9 @@ namespace LMS.Areas.Identity.Pages.Account
             }
             catch
             {
-                throw new InvalidOperationException( $"Can't create an instance of '{nameof( ApplicationUser )}'. " +
-                    $"Ensure that '{nameof( IdentityUser )}' is not an abstract class and has a parameterless constructor, or alternatively " +
-                    $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml" );
+                throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                    $"Ensure that '{nameof(IdentityUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
+                    $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml");
             }
         }
 
@@ -193,22 +194,65 @@ namespace LMS.Areas.Identity.Pages.Account
         /// <param name="departmentAbbrev">The department abbreviation that the user belongs to (ignore for Admins) </param>
         /// <param name="role">The user's role: one of "Administrator", "Professor", "Student"</param>
         /// <returns>The uID of the new user</returns>
-        string CreateNewUser( string firstName, string lastName, DateTime DOB, string departmentAbbrev, string role )
+        string CreateNewUser(string firstName, string lastName, DateTime DOB, string departmentAbbrev, string role)
         {
-            using(LMSContext db = new LMSContext())
+            string nextUID = "u0000000";
+            // Get current highest uid number from combination of Administrators, Professors, and Students tables. 
+            if (db.Administrators.Count() + db.Students.Count() + db.Professors.Count() != 0)
             {
-                switch ( role )
-                {
-                    case "Administrator":
-                        Administrator admin = new Administrator();
-                        admin.FirstName = firstName;
-                        admin.LastName = lastName;
-                        admin.Dob = DateOnly.FromDateTime(DOB);
-                        db.Administrators.Add( admin );
-                        break;
-                }
+                nextUID = "u" + (int.Parse((
+                    from uid in (
+                    from a in db.Administrators
+                    orderby a.UId descending
+                    select a.UId).Take(1).Union((
+                    from s in db.Students
+                    orderby s.UId descending
+                    select s.UId).Take(1)
+                    ).Union((
+                    from p in db.Professors
+                    orderby p.UId descending
+                    select p.UId).Take(1))
+                    orderby uid descending
+                    select uid).Take(1).First().Substring(1)) + 1).ToString().PadLeft(7, '0');
             }
-            return "unknown";
+
+            switch (role)
+            {
+                case "Administrator":
+                    Administrator newAdmin = new Administrator();
+                    newAdmin.FirstName = firstName;
+                    newAdmin.LastName = lastName;
+                    newAdmin.Dob = DateOnly.FromDateTime(DOB);
+                    newAdmin.UId = nextUID;
+
+                    db.Administrators.Add(newAdmin);
+                    db.SaveChanges();
+                    break;
+                case "Professor":
+                    Professor newProfessor = new Professor();
+                    newProfessor.FirstName = firstName;
+                    newProfessor.LastName = lastName;
+                    newProfessor.Dob = DateOnly.FromDateTime(DOB);
+                    newProfessor.UId = nextUID;
+                    newProfessor.WorksIn = departmentAbbrev;
+
+                    db.Professors.Add(newProfessor);
+                    db.SaveChanges();
+                    break;
+                case "Student":
+                    Student newStudent = new Student();
+                    newStudent.FirstName = firstName;
+                    newStudent.LastName = lastName;
+                    newStudent.Dob = DateOnly.FromDateTime(DOB);
+                    newStudent.UId = nextUID;
+                    newStudent.Major = departmentAbbrev;
+
+                    db.Students.Add(newStudent);
+                    db.SaveChanges();
+                    break;
+            }
+      
+            return nextUID;
         }
 
         /*******End code to modify********/
