@@ -50,9 +50,12 @@ namespace LMS.Controllers
         /// false if the department already exists, true otherwise.</returns>
         public IActionResult CreateDepartment(string subject, string name)
         {
+            // Create new department object
             Department newDepartment = new Department();
             newDepartment.Subject = subject;
             newDepartment.Name = name;
+
+            // Try and save to database
             db.Departments.Add(newDepartment);
             try
             {
@@ -97,6 +100,7 @@ namespace LMS.Controllers
         /// <returns>The JSON result</returns>
         public IActionResult GetProfessors(string subject)
         {
+            // Query for getting all the professors in a certain subject.
             var professors =
                 from p in db.Professors
                 where p.WorksIn == subject
@@ -124,8 +128,24 @@ namespace LMS.Controllers
         /// false if the course already exists, true otherwise.</returns>
         public IActionResult CreateCourse(string subject, int number, string name)
         {
+            // Create new course
+            Course newCourse = new Course();
+            // If course number is longer than 4 digits, this will just grab the first four
+            newCourse.Number = ushort.Parse(number.ToString().Substring(0, 4));
+            newCourse.Listing = subject;
+            newCourse.Name = name;
 
-            return Json(new { success = false });
+            // Try and add it to the course catalog
+            db.Courses.Add(newCourse);
+            try
+            {
+                db.SaveChanges();
+                return Json(new { success = true });
+            } catch
+            {
+                return Json(new { success = false });
+            }
+            
         }
 
 
@@ -148,7 +168,47 @@ namespace LMS.Controllers
         /// true otherwise.</returns>
         public IActionResult CreateClass(string subject, int number, string season, int year, DateTime start, DateTime end, string location, string instructor)
         {
-            return Json(new { success = false });
+            // Get course offereing ID
+            int cid =
+                (from c in db.Courses
+                where c.Number == number && c.Listing == subject
+                select c.CId).First();
+
+            // Get other classes at the same location
+            var otherClassesAtSameLocation = 
+                from c in db.Classes
+                where c.Location == location
+                select c;
+
+            // Check for double bookings
+            foreach (var c in otherClassesAtSameLocation)
+            {
+                if(c.StartTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end)) || c.EndTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end))){
+                    return Json(new { success = false });
+                }
+            }
+
+            // Create new class
+            Class newClass = new Class();
+            newClass.CId = cid;
+            newClass.Year = ushort.Parse(year.ToString().Substring(0, 4));
+            newClass.StartTime = TimeOnly.FromDateTime(start);
+            newClass.EndTime = TimeOnly.FromDateTime(end);
+            newClass.Location = location;
+            newClass.Season = season;
+            newClass.Teacher = instructor;
+
+            // Try and add class
+            db.Classes.Add(newClass);
+            try
+            {
+                db.SaveChanges();
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
         }
 
 

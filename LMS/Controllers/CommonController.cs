@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading.Tasks;
 using LMS.Models.LMSModels;
@@ -54,8 +55,21 @@ namespace LMS.Controllers
         /// </summary>
         /// <returns>The JSON array</returns>
         public IActionResult GetCatalog()
-        {            
-            return Json(null);
+        {
+            var catalog =
+                from d in db.Departments
+                select new
+                {
+                    subject = d.Subject,
+                    dname = d.Name,
+                    courses = from c in d.Courses
+                              select new
+                              {
+                                  number = c.Number,
+                                  cname = c.Name
+                              }
+                };
+            return Json(catalog.ToArray());
         }
 
         /// <summary>
@@ -73,8 +87,31 @@ namespace LMS.Controllers
         /// <param name="number">The course number, as in 5530</param>
         /// <returns>The JSON array</returns>
         public IActionResult GetClassOfferings(string subject, int number)
-        {            
-            return Json(null);
+        {
+            // Get course offereing ID
+            int cid =
+                (from c in db.Courses
+                 where c.Number == number && c.Listing == subject
+                 select c.CId).First();
+
+            // Get all the classes from that cID and join with professors to get their names
+            var classes =
+                from c in db.Classes
+                where c.CId == cid
+                join p in db.Professors on c.Teacher equals p.UId
+                into combined
+                from a in combined
+                select new
+                {
+                    season = c.Season,
+                    year = c.Year,
+                    location = c.Location,
+                    start = c.StartTime,
+                    end = c.EndTime,
+                    fname = a.FirstName,
+                    lname = a.LastName
+                };
+            return Json(classes.ToArray());
         }
 
         /// <summary>
