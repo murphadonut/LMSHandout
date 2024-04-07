@@ -11,6 +11,7 @@ using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using LMS.Controllers;
 using LMS.Models;
 using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authentication;
@@ -194,6 +195,19 @@ namespace LMS.Areas.Identity.Pages.Account
         /// <returns>The uID of the new user</returns>
         string CreateNewUser( string firstName, string lastName, DateTime DOB, string departmentAbbrev, string role )
         {
+            using(LMSContext db = new LMSContext())
+            {
+                switch ( role )
+                {
+                    case "Administrator":
+                        Administrator admin = new Administrator();
+                        admin.FirstName = firstName;
+                        admin.LastName = lastName;
+                        admin.Dob = DateOnly.FromDateTime(DOB);
+                        db.Administrators.Add( admin );
+                        break;
+                }
+            }
             return "unknown";
         }
 
