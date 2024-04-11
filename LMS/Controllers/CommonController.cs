@@ -7,6 +7,9 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NuGet.Protocol;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 [assembly: InternalsVisibleTo( "LMSControllerTests" )]
@@ -88,30 +91,29 @@ namespace LMS.Controllers
         /// <returns>The JSON array</returns>
         public IActionResult GetClassOfferings(string subject, int number)
         {
-            // Get course offereing ID
-            int cid =
-                (from c in db.Courses
-                 where c.Number == number && c.Listing == subject
-                 select c.CId).First();
-
-            // Get all the classes from that cID and join with professors to get their names
+            // get all classes from a subject and number
             var classes =
-                from c in db.Classes
-                where c.CId == cid
-                join p in db.Professors on c.Teacher equals p.UId
-                into combined
-                from a in combined
+                (from course in db.Courses
+                 where course.Number == number && course.Listing == subject
+                 select course.Classes).First();
+
+            // Get teachers for each of the classes in the list above
+            var joined =
+                from classs in classes
+                join professor in db.Professors on classs.Teacher equals professor.UId
+                into classWithMoreDetails
+                from detailedClass in classWithMoreDetails
                 select new
                 {
-                    season = c.Season,
-                    year = c.Year,
-                    location = c.Location,
-                    start = c.StartTime,
-                    end = c.EndTime,
-                    fname = a.FirstName,
-                    lname = a.LastName
+                    season = classs.Season,
+                    year = classs.Year,
+                    location = classs.Location,
+                    start = classs.StartTime,
+                    end = classs.EndTime,
+                    fname = detailedClass.FirstName,
+                    lname = detailedClass.LastName
                 };
-            return Json(classes.ToArray());
+            return Json(joined.ToArray());
         }
 
         /// <summary>
@@ -127,10 +129,51 @@ namespace LMS.Controllers
         /// <param name="asgname">The name of the assignment in the category</param>
         /// <returns>The assignment contents</returns>
         public IActionResult GetAssignmentContents(string subject, int num, string season, int year, string category, string asgname)
-        {            
-            return Content("");
+        {
+            /*// Get course offereing ID
+            int cid =
+            (from c in db.Courses
+                 where c.Number == num && c.Listing == subject
+                 select c.CId).First();
+
+            // Get class id
+            int classID =
+                (from c in db.Classes
+                 where c.CId == cid && c.Season == season && c.Year == year
+                 select c.ClassId).First();
+
+            // Get assignment category
+            int acID =
+                (from ac in db.AssignmentCategories
+                 where ac.ClassId == classID && ac.Name == category
+                 select ac.AcId).First();
+
+            // Get assignment ID
+            Assignment assignment = 
+                (from a in db.Assignments
+                 where a.AcId == acID && a.Name == asgname
+                 select a).First();
+
+            return Content(assignment.Contents);*/
+            return Content((
+                from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join class1 in db.Classes on course.CId equals class1.CId
+                into classes
+                from class2 in classes
+                where class2.Year == year && class2.Season == season
+                join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
+                into assignmentCategories
+                from ac2 in assignmentCategories
+                where ac2.Name == category
+                join a1 in db.Assignments on ac2.AcId equals a1.AcId
+                into assignments
+                from a2 in assignments
+                where a2.Name == asgname
+                select a2.Contents).First());
         }
 
+        // Note, if the above method works, I could simplify the lower method too
 
         /// <summary>
         /// This method does NOT return JSON. It returns plain text (containing html).
@@ -147,8 +190,38 @@ namespace LMS.Controllers
         /// <param name="uid">The uid of the student who submitted it</param>
         /// <returns>The submission text</returns>
         public IActionResult GetSubmissionText(string subject, int num, string season, int year, string category, string asgname, string uid)
-        {            
-            return Content("");
+        {
+            // Get course offereing ID
+            int cid =
+            (from c in db.Courses
+             where c.Number == num && c.Listing == subject
+             select c.CId).First();
+
+            // Get class id
+            int classID =
+                (from c in db.Classes
+                 where c.CId == cid && c.Season == season && c.Year == year
+                 select c.ClassId).First();
+
+            // Get assignment category
+            int acID =
+                (from ac in db.AssignmentCategories
+                 where ac.ClassId == classID && ac.Name == category
+                 select ac.AcId).First();
+
+            // Get assignment ID
+            int aID =
+                (from a in db.Assignments
+                 where a.AcId == acID && a.Name == asgname
+                 select a.AId).First();
+
+            // Get submission
+            Submission? sub = 
+                (from s in db.Submissions
+                 where s.Student == uid && s.AId == aID
+                 select s).FirstOrDefault();
+
+            return Content(sub == null ? "" : sub.Contents ?? "");
         }
 
 
@@ -169,7 +242,25 @@ namespace LMS.Controllers
         /// or an object containing {success: false} if the user doesn't exist
         /// </returns>
         public IActionResult GetUser(string uid)
-        {           
+        {
+            var student = db.Students.Find(uid);
+            if (student != null)
+            {
+                return Json(new{fname = student.FirstName, lname = student.LastName, uid = student.UId, department = student.Major});
+            }
+
+            var professor = db.Professors.Find(uid);
+            if (professor != null)
+            {
+                return Json(new { fname = professor.FirstName, lname = professor.LastName, uid = professor.UId, department = professor.WorksIn });
+            }
+
+            var admin = db.Administrators.Find(uid);
+            if(admin != null)
+            {
+                return Json(new { fname = admin.FirstName, lname = admin.LastName, uid = admin.UId });
+            }
+
             return Json(new { success = false });
         }
 
