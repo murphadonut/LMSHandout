@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis.VisualBasic.Syntax;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-[assembly: InternalsVisibleTo( "LMSControllerTests" )]
+[assembly: InternalsVisibleTo("LMSControllerTests")]
 namespace LMS_CustomIdentity.Controllers
 {
     [Authorize(Roles = "Professor")]
@@ -121,32 +122,29 @@ namespace LMS_CustomIdentity.Controllers
             // Get all enrollments of certain class
             var enrollments =
                 (from course in db.Courses
-                where course.Number == num && course.Listing == subject
-                join cls in db.Classes on course.CId equals cls.CId
-                into classes
-                from c in classes
-                where c.Year == year && c.Season == season
-                select c.Enrollments).First();
+                 where course.Number == num && course.Listing == subject
+                 join cls in db.Classes on course.CId equals cls.CId
+                 into classes
+                 from c in classes
+                 where c.Year == year && c.Season == season
+                 select c.Enrollments).First();
 
             // join that with students
             var students =
-                from e in enrollments
-                join s in db.Students on e.Student equals s.UId
-                into stds
-                from stud in stds
+                from student in enrollments
                 select new
                 {
-                    fname = stud.FirstName,
-                    lname = stud.LastName,
-                    uid = stud.UId,
-                    dob = stud.Dob,
-                    grade = e.Grade
+                    fname = student.StudentNavigation.FirstName,
+                    lname = student.StudentNavigation.LastName,
+                    uid = student.StudentNavigation.UId,
+                    dob = student.StudentNavigation.Dob,
+                    grade = student.Grade
                 };
 
             return Json(students.ToArray());
         }
 
-
+        // LEFT OFF HERE MURPHY
 
         /// <summary>
         /// Returns a JSON array with all the assignments in an assignment category for a class.
@@ -166,6 +164,53 @@ namespace LMS_CustomIdentity.Controllers
         /// <returns>The JSON array</returns>
         public IActionResult GetAssignmentsInCategory(string subject, int num, string season, int year, string category)
         {
+            List<Assignment> assignments = new List<Assignment>();
+            var assignmentLists =
+                from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join class1 in db.Classes on course.CId equals class1.CId
+                into classes
+                from class2 in classes
+                where class2.Year == year && class2.Season == season
+                join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
+                into assignmentCategories
+                from ac2 in assignmentCategories
+                select ac2.Assignments;
+
+            // Iterate over all categories, see first if statement in inner most foreach loop
+            foreach (var assignmentList in assignmentLists)
+            {
+                // Iterate over all assignments in each category
+                foreach (var assignment in assignmentList)
+                {
+                    // if a category is provided, category != null will be true
+                    // so then, if the current assignment isn't under that specific category
+                    // we need to break out of this assignment category's list.
+                    if (assignment.Ac.Name != category && category != null)
+                    {
+                        break;
+                    }
+                    assignments.Add(assignment);
+                }
+            }
+
+
+            /*            var a =
+
+                            join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
+                            into assignmentCategories
+                            from ac2 in assignmentCategories
+                            where ac2.Name == category
+                            join a1 in db.Assignments on ac2.AcId equals a1.AcId
+                            into assignments
+                            from a2 in assignments
+                            select new
+                            {
+                                aname = a2.Name,
+                                cname = ac2.Name,
+                                due = a2.Due,
+                                submissions = 
+                            };*/
             return Json(null);
         }
 
@@ -275,12 +320,12 @@ namespace LMS_CustomIdentity.Controllers
         /// <param name="uid">The professor's uid</param>
         /// <returns>The JSON array</returns>
         public IActionResult GetMyClasses(string uid)
-        {            
+        {
             return Json(null);
         }
 
 
-        
+
         /*******End code to modify********/
     }
 }
