@@ -8,6 +8,7 @@ namespace LMS.Models.LMSModels
         public Student()
         {
             Enrollments = new HashSet<Enrollment>();
+            Submissions = new HashSet<Submission>();
         }
 
         public string UId { get; set; } = null!;
@@ -18,5 +19,6 @@ namespace LMS.Models.LMSModels
 
         public virtual Department MajorNavigation { get; set; } = null!;
         public virtual ICollection<Enrollment> Enrollments { get; set; }
+        public virtual ICollection<Submission> Submissions { get; set; }
     }
 }

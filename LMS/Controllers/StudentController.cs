@@ -172,15 +172,29 @@ namespace LMS.Controllers
                 where a2.Name == asgname
                 select a2.AId).First();
 
-            Submission sub = new()
-            {
-                Contents = contents,
-                AId = assID,
-                Student = uid,
-                Score = 0
-            };
+            Submission? sub =
+                (from s in db.Submissions
+                where s.AId == assID && s.Student == uid
+                select s).FirstOrDefault();
 
-            db.Submissions.Add(sub);
+            if(sub == null)
+            {
+                sub = new()
+                {
+                    Contents = contents,
+                    AId = assID,
+                    Student = uid,
+                    Score = 0
+                };
+
+                db.Submissions.Add(sub);
+            }
+            else
+            {
+                sub.Contents = contents;
+                sub.SubmittedOn = DateTime.Now;
+            }
+
             try
             {
                 db.SaveChanges();

@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -124,28 +126,29 @@ namespace LMS_CustomIdentity.Controllers
         public IActionResult GetStudentsInClass(string subject, int num, string season, int year)
         {
             // Get all enrollments of certain class
-            var enrollments =
-                (from course in db.Courses
-                 where course.Number == num && course.Listing == subject
-                 join cls in db.Classes on course.CId equals cls.CId
-                 into classes
-                 from c in classes
-                 where c.Year == year && c.Season == season
-                 select c.Enrollments).First();
-
-            // join that with students
-            var students =
-                from student in enrollments
+            var grades =
+                from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join cls in db.Classes on course.CId equals cls.CId
+                into classes
+                from c in classes
+                where c.Year == year && c.Season == season
+                join e1 in db.Enrollments on c.ClassId equals e1.Class
+                into enrollments
+                from e2 in enrollments
+                join s1 in db.Students on e2.Student equals s1.UId
+                into students
+                from s2 in students
                 select new
                 {
-                    fname = student.StudentNavigation.FirstName,
-                    lname = student.StudentNavigation.LastName,
-                    uid = student.StudentNavigation.UId,
-                    dob = student.StudentNavigation.Dob,
-                    grade = student.Grade
+                    fname = s2.FirstName,
+                    lname = s2.LastName,
+                    uid = s2.UId,
+                    dob = s2.Dob,
+                    grade = e2.Grade
                 };
 
-            return Json(students.ToArray());
+            return Json(grades.ToArray());
         }
 
         /// <summary>
@@ -411,15 +414,29 @@ namespace LMS_CustomIdentity.Controllers
         /// <returns>A JSON object containing success = true/false</returns>
         public IActionResult GradeSubmission(string subject, int num, string season, int year, string category, string asgname, string uid, int score)
         {
-            (from course in db.Courses
+            double numberGrade = 0;
+            double totalCat = 0;
+
+            // Get the class
+            var theClass =
+                from course in db.Courses
                 where course.Number == num && course.Listing == subject
                 join class1 in db.Classes on course.CId equals class1.CId
                 into classes
                 from class2 in classes
                 where class2.Year == year && class2.Season == season
+                select class2;
+                
+            // Get assignment categories for class
+            var acs =
+                from class2 in theClass
                 join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
                 into assignmentCategories
                 from ac2 in assignmentCategories
+                select ac2;
+
+            // Update the assignment score
+            (from ac2 in acs
                 where ac2.Name == category
                 join a1 in db.Assignments on ac2.AcId equals a1.AcId
                 into assignments
@@ -430,6 +447,51 @@ namespace LMS_CustomIdentity.Controllers
                 from s2 in submissions
                 where s2.Student == uid
                 select s2).First().Score = Convert.ToUInt16(score);
+
+            // compute class grade
+            foreach(var cat in acs.ToList()) { 
+                var a =
+                    from ac2 in acs
+                    join a1 in db.Assignments on ac2.AcId equals a1.AcId
+                    into assignments
+                    from a2 in assignments
+                    select a2;
+                double catTotal = 0;
+                double max = 0;
+                foreach (var assignment in a.ToList())
+                {
+                    int? sub =
+                        (from s in db.Submissions
+                        where s.AId == assignment.AId && s.Student == uid
+                        select s.Score).FirstOrDefault();
+                    catTotal += sub ?? 0;
+                    max += assignment.Points;
+                }
+
+                numberGrade += cat.Weight * catTotal / max;
+                totalCat += cat.Weight;
+            }
+
+            numberGrade *= 100 / totalCat;
+            string letterGrade = numberGrade switch
+            {
+                < 60 => "E",
+                < 63 => "D-",
+                < 67 => "D",
+                < 70 => "D+",
+                < 73 => "C-",
+                < 77 => "C",
+                < 80 => "C+",
+                < 83 => "B-",
+                < 87 => "B",
+                < 90 => "B+",
+                < 93 => "A-",
+                >= 93 => "A",
+                _ => "--",
+            };
+            (from e in db.Enrollments
+             where e.Student == uid && e.Class == theClass.First().ClassId
+             select e).First().Grade = letterGrade;
 
             try
             {
@@ -469,8 +531,6 @@ namespace LMS_CustomIdentity.Controllers
                 };
             return Json(myClasses.ToArray());
         }
-
-
 
         /*******End code to modify********/
     }

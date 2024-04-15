@@ -287,36 +287,36 @@ namespace LMS.Models.LMSModels
 
             modelBuilder.Entity<Submission>(entity =>
             {
-                entity.HasNoKey();
+                entity.HasKey(e => new { e.AId, e.Student })
+                    .HasName("PRIMARY")
+                    .HasAnnotation("MySql:IndexPrefixLength", new[] { 0, 0 });
 
                 entity.HasIndex(e => e.Student, "Student");
-
-                entity.HasIndex(e => e.AId, "aID");
 
                 entity.Property(e => e.AId)
                     .HasColumnType("int(11)")
                     .HasColumnName("aID");
 
-                entity.Property(e => e.Contents).HasColumnType("mediumtext");
-
-                entity.Property(e => e.Score).HasColumnType("smallint(5) unsigned");
-
                 entity.Property(e => e.Student)
                     .HasMaxLength(8)
                     .IsFixedLength();
+
+                entity.Property(e => e.Contents).HasColumnType("mediumtext");
+
+                entity.Property(e => e.Score).HasColumnType("smallint(5) unsigned");
 
                 entity.Property(e => e.SubmittedOn)
                     .HasColumnType("datetime")
                     .HasDefaultValueSql("current_timestamp()");
 
                 entity.HasOne(d => d.AIdNavigation)
-                    .WithMany()
+                    .WithMany(p => p.Submissions)
                     .HasForeignKey(d => d.AId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("Submissions_ibfk_1");
 
                 entity.HasOne(d => d.StudentNavigation)
-                    .WithMany()
+                    .WithMany(p => p.Submissions)
                     .HasForeignKey(d => d.Student)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("Submissions_ibfk_2");
