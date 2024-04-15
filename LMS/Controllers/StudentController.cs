@@ -75,8 +75,20 @@ namespace LMS.Controllers
         /// <param name="uid">The uid of the student</param>
         /// <returns>The JSON array</returns>
         public IActionResult GetMyClasses(string uid)
-        {           
-            return Json(null);
+        {
+            var classes = 
+                from e in db.Enrollments
+                where e.Student == uid
+                select new
+                {
+                    subject = e.ClassNavigation.CIdNavigation.Listing,
+                    number = e.ClassNavigation.CIdNavigation.Number,
+                    name = e.ClassNavigation.CIdNavigation.Name,
+                    season = e.ClassNavigation.Season,
+                    year = e.ClassNavigation.Year,
+                    grade = e.Grade
+                };
+            return Json(classes.ToArray());
         }
 
         /// <summary>
@@ -94,8 +106,31 @@ namespace LMS.Controllers
         /// <param name="uid"></param>
         /// <returns>The JSON array</returns>
         public IActionResult GetAssignmentsInClass(string subject, int num, string season, int year, string uid)
-        {            
-            return Json(null);
+        {
+            var ass =
+                from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join class1 in db.Classes on course.CId equals class1.CId
+                into classes
+                from class2 in classes
+                where class2.Year == year && class2.Season == season
+                join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
+                into assignmentCategories
+                from ac2 in assignmentCategories
+                join a1 in db.Assignments on ac2.AcId equals a1.AcId
+                into assignments
+                from a2 in assignments
+                select new
+                {
+                    aname = a2.Name,
+                    cname = ac2.Name,
+                    due = a2.Due,
+                    score = 
+                        (from s in db.Submissions
+                        where s.AId == a2.AId && s.Student == uid
+                        select s.Score).First() ?? 0
+                };
+            return Json(ass.ToArray());
         }
 
 
@@ -119,8 +154,42 @@ namespace LMS.Controllers
         /// <returns>A JSON object containing {success = true/false}</returns>
         public IActionResult SubmitAssignmentText(string subject, int num, string season, int year,
           string category, string asgname, string uid, string contents)
-        {           
-            return Json(new { success = false });
+        {
+            int assID =
+                (from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join class1 in db.Classes on course.CId equals class1.CId
+                into classes
+                from class2 in classes
+                where class2.Year == year && class2.Season == season
+                join ac1 in db.AssignmentCategories on class2.ClassId equals ac1.ClassId
+                into assignmentCategories
+                from ac2 in assignmentCategories
+                where ac2.Name == category
+                join a1 in db.Assignments on ac2.AcId equals a1.AcId
+                into assignments
+                from a2 in assignments
+                where a2.Name == asgname
+                select a2.AId).First();
+
+            Submission sub = new()
+            {
+                Contents = contents,
+                AId = assID,
+                Student = uid,
+                Score = 0
+            };
+
+            db.Submissions.Add(sub);
+            try
+            {
+                db.SaveChanges();
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
         }
 
 
@@ -135,8 +204,33 @@ namespace LMS.Controllers
         /// <returns>A JSON object containing {success = {true/false}. 
         /// false if the student is already enrolled in the class, true otherwise.</returns>
         public IActionResult Enroll(string subject, int num, string season, int year, string uid)
-        {          
-            return Json(new { success = false});
+        {
+            int classID =
+                (from course in db.Courses
+                where course.Number == num && course.Listing == subject
+                join class1 in db.Classes on course.CId equals class1.CId
+                into classes
+                from class2 in classes
+                where class2.Year == year && class2.Season == season
+                select class2.ClassId).First();
+
+            Enrollment e = new()
+            {
+                Student = uid,
+                Grade = "--",
+                Class = classID,
+            };
+
+            db.Enrollments.Add(e);
+            try
+            {
+                db.SaveChanges();
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
         }
 
 

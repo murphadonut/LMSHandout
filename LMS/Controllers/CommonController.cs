@@ -96,26 +96,26 @@ namespace LMS.Controllers
         public IActionResult GetClassOfferings(string subject, int number)
         {
             // get all classes from a subject and number
-            var classes =
-                (from course in db.Courses
-                 where course.Number == number && course.Listing == subject
-                 select course.Classes).First();
-
-            // Get teachers for each of the classes in the list above
-            var joined =
-                from classs in classes
+            var c =
+                from course in db.Courses
+                where course.Number == number && course.Listing == subject
+                join c1 in db.Classes on course.CId equals c1.CId
+                into classes
+                from c2 in classes
+                join t1 in db.Professors on c2.Teacher equals t1.UId
+                into teachers
+                from t2 in teachers
                 select new
                 {
-                    season = classs.Season,
-                    year = classs.Year,
-                    location = classs.Location,
-                    start = classs.StartTime,
-                    end = classs.EndTime,
-                    fname = classs.TeacherNavigation.FirstName,
-                    lname = classs.TeacherNavigation.LastName
+                    season = c2.Season,
+                    year = c2.Year,
+                    location = c2.Location,
+                    start = c2.StartTime,
+                    end = c2.EndTime,
+                    fname = t2.FirstName,
+                    lname = t2.LastName
                 };
-
-            return Json(joined.ToArray());
+            return Json(c.ToArray());
         }
 
         /// <summary>
@@ -149,8 +149,6 @@ namespace LMS.Controllers
                 where a2.Name == asgname
                 select a2.Contents).First());
         }
-
-        // Note, if the above method works, I could simplify the lower method too
 
         /// <summary>
         /// This method does NOT return JSON. It returns plain text (containing html).
