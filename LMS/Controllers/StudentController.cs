@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using LMS.Models.LMSModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 [assembly: InternalsVisibleTo( "LMSControllerTests" )]
@@ -261,8 +262,63 @@ namespace LMS.Controllers
         /// <param name="uid">The uid of the student</param>
         /// <returns>A JSON object containing a single field called "gpa" with the number value</returns>
         public IActionResult GetGPA(string uid)
-        {            
-            return Json(null);
+        {
+            var enrollments =
+                from e in db.Enrollments
+                where e.Student == uid
+                select e;
+
+            double gpa = 0;
+            int classCount = 0;
+            if (enrollments != null)
+            
+                foreach (var enrollment in enrollments)
+                {
+                    if(!enrollment.Grade.Equals("--"))
+                    {
+                        classCount++;
+                        switch (enrollment.Grade)
+                        {
+                            case "A":
+                                gpa += 16;
+                                break;
+                            case "A-":
+                                gpa += 14.8;
+                                break;
+                            case "B+":
+                                gpa += 13.2;
+                                break;
+                            case "B":
+                                gpa += 12;
+                                break;
+                            case "B-":
+                                gpa += 10.8;
+                                break;
+                            case "C+":
+                                gpa += 9.2;
+                                break;
+                            case "C":
+                                gpa += 8;
+                                break;
+                            case "C-":
+                                gpa += 6.8;
+                                break;
+                            case "D+":
+                                gpa += 5.2;
+                                break;
+                            case "D":
+                                gpa += 4.0;
+                                break;
+                            case "D-":
+                                gpa += 2.8;
+                                break;
+                        }
+                    }                
+                gpa = gpa / (4 * classCount);
+            }
+
+            System.Diagnostics.Debug.WriteLine("GPA is sdfsdfsdf: " + gpa);
+            return Json(new { gpa = gpa });
         }
                 
         /*******End code to modify********/
