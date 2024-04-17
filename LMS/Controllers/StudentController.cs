@@ -274,6 +274,7 @@ namespace LMS.Controllers
             
                 foreach (var enrollment in enrollments)
                 {
+                    System.Diagnostics.Debug.WriteLine(enrollment.Grade + " is the GRADE!!!");
                     if(!enrollment.Grade.Equals("--"))
                     {
                         classCount++;
@@ -313,12 +314,15 @@ namespace LMS.Controllers
                                 gpa += 2.8;
                                 break;
                         }
+                        
                     }                
+                
+                }
+            if(classCount != 0)
+            {
                 gpa = gpa / (4 * classCount);
             }
-
-            System.Diagnostics.Debug.WriteLine("GPA is sdfsdfsdf: " + gpa);
-            return Json(new { gpa = gpa });
+            return Json(new {gpa});
         }
                 
         /*******End code to modify********/

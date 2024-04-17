@@ -24,8 +24,10 @@ namespace LMSControllerTests
 
             dynamic x = allDepts.Value;
 
-            Assert.Equal( 1, x.Length );
+            Assert.Equal( 2, x.Length );
+            Assert.Equal(true, x[0].Name.Length == 100 || x[1].Name.Length == 100);
             Assert.Equal( "CS", x[0].subject );
+            Assert.Fail();
         }
 
 
@@ -47,6 +49,7 @@ namespace LMSControllerTests
             db.Database.EnsureCreated();
 
             db.Departments.Add( new Department { Name = "KSoC", Subject = "CS" } );
+            db.Departments.Add(new Department { Name = "testsetsesadfkjalsdgjkoaewirjsodjglkdjflkjglewajrogfjdsogjawoiejoisjdoifjsaiodfjsoidjfsdfijsdofjfjfj", Subject = "TEST" });
 
             // TODO: add more objects to the test database
 

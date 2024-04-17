@@ -472,6 +472,7 @@ namespace LMS_CustomIdentity.Controllers
             return Json(subs.ToArray());
         }
 
+        // FIX THIS, IS DELAYED BY ONE SCORING
 
         /// <summary>
         /// Set the score of an assignment submission
@@ -510,19 +511,29 @@ namespace LMS_CustomIdentity.Controllers
 
             // Update the assignment score
             (from ac2 in acs
-                where ac2.Name == category
-                join a1 in db.Assignments on ac2.AcId equals a1.AcId
-                into assignments
-                from a2 in assignments
-                where a2.Name == asgname
-                join s1 in db.Submissions on a2.AId equals s1.AId
-                into submissions
-                from s2 in submissions
-                where s2.Student == uid
-                select s2).First().Score = Convert.ToUInt16(score);
+             where ac2.Name == category
+             join a1 in db.Assignments on ac2.AcId equals a1.AcId
+             into assignments
+             from a2 in assignments
+             where a2.Name == asgname
+             join s1 in db.Submissions on a2.AId equals s1.AId
+             into submissions
+             from s2 in submissions
+             where s2.Student == uid
+             select s2).First().Score = (ushort)score;
+
+            // Update it on server
+            try
+            {
+                db.SaveChanges();
+            }
+            catch
+            {
+                return Json(new { success = false });
+            }
 
             // compute class grade
-            foreach(var cat in acs.ToList()) { 
+            foreach (var cat in acs.ToList()) { 
                 var a =
                     from ac2 in acs
                     join a1 in db.Assignments on ac2.AcId equals a1.AcId

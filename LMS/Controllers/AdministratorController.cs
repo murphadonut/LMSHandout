@@ -131,7 +131,7 @@ namespace LMS.Controllers
             // Create new course
             Course newCourse = new Course();
             // If course number is longer than 4 digits, this will just grab the first four
-            newCourse.Number = ushort.Parse(number.ToString().Substring(0, 4));
+            newCourse.Number = ushort.Parse(number.ToString().Substring(0, number.ToString().Length > 4 ? 4 : number.ToString().Length));
             newCourse.Listing = subject;
             newCourse.Name = name;
 
@@ -183,7 +183,7 @@ namespace LMS.Controllers
             // Check for double bookings
             foreach (var c in otherClassesAtSameLocation)
             {
-                if(c.StartTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end)) || c.EndTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end))){
+                if(c.Season.Equals(season) && c.StartTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end)) || c.EndTime.IsBetween(TimeOnly.FromDateTime(start), TimeOnly.FromDateTime(end))){
                     return Json(new { success = false });
                 }
             }
